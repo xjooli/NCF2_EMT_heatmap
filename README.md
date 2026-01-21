@@ -16,5 +16,4 @@ The data was accessed from https://www.cbioportal.org/study/summary?id=brca_tcga
 The dataset is publicly available via cBioPortal. Please cite cBioPortal and the original data source as required by the dataset’s terms.
 
 ## Output
-- `NCF2_heatmap_A4_300dpi.tiff`
-- `NCF2_heatmap_A4.pdf`
+- "NCF2_high_vs_low_heatmap.tiff"
