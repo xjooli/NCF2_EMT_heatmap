@@ -1,0 +1,156 @@
+---
+title: "NCF2 High vs Low Expression Heatmap"
+output:
+  html_document:
+    toc: true
+    toc_depth: 2
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE)
+```
+
+```{r Libraries}
+library(pheatmap)
+library(RColorBrewer)
+```
+
+```{r Parameters}
+infile <- "mRNA expression z-scores relative to all samples (log RNA Seq V2 RSEM) (4).txt"
+target_gene <- "NCF2"
+n_each <- 50
+```
+
+```{r Load data}
+df <- read.table(infile, sep = "\t", header = TRUE, check.names = FALSE)
+
+stopifnot("SAMPLE_ID" %in% names(df))
+stopifnot(target_gene %in% names(df))
+
+df[[target_gene]] <- suppressWarnings(as.numeric(as.character(df[[target_gene]])))
+stopifnot(!all(is.na(df[[target_gene]])))
+```
+
+```{r Select top/bottom samples by target gene}
+df_ord <- df[order(df[[target_gene]], decreasing = TRUE, na.last = NA), ]
+
+top_n <- head(df_ord, n_each)
+bot_n <- tail(df_ord, n_each)
+
+df_sel <- rbind(top_n, bot_n)
+df_sel$NCF2expr <- factor(rep(c("High", "Low"), each = n_each), levels = c("High","Low"))
+rownames(df_sel) <- df_sel$SAMPLE_ID
+```
+
+```{r Expression matrix}
+exclude_cols <- c("STUDY_ID","SAMPLE_ID", "NCF2", "NCF2expr")
+expr_cols <- setdiff(names(df_sel), exclude_cols)
+
+X <- df_sel[, expr_cols, drop = FALSE]
+X[] <- lapply(X, function(x) suppressWarnings(as.numeric(as.character(x))))
+
+X <- X[, !apply(is.na(X), 2, all), drop = FALSE]
+```
+
+```{r Annotation}
+#Sample annotation
+col_annotation <- data.frame(NCF2 = df_sel$NCF2expr) 
+rownames(col_annotation) <- rownames(df_sel)
+
+#Gene annotation
+gene_names <- colnames(X)
+marker <- rep("Additional GOI: Other", length(gene_names))
+names(marker) <- gene_names
+
+if (length(gene_names) >= (191 + 137 + 24)) {
+  marker[1:191] <- "HALLMARK EMT"
+  marker[192:(191+137)] <- "Downreg EMT"
+  marker[(191+137+1):(191+137+24)] <- "Additional GOI: Other"
+} else {
+  stop("Gene count is not as expected; update marker assignment logic.")
+}
+
+row_annotation <- data.frame(Marker = factor(marker))
+rownames(row_annotation) <- gene_names
+
+M_plus_genes <- c("SNAI2","ZEB1","ZEB2","TWIST1","TWIST2","HGF")
+E_plus_genes <- c("EpCAM","TJP1","CLDN1","CLDN3","CTNNB1","KRT7")
+row_annotation$Marker[rownames(row_annotation) %in% M_plus_genes] <- "Additional GOI: M+"
+row_annotation$Marker[rownames(row_annotation) %in% E_plus_genes] <- "Additional GOI: E+"
+row_annotation$Marker <- droplevels(row_annotation$Marker)
+
+#Annotation colors
+annotation_colors <- list(
+  Marker = c(
+    "HALLMARK EMT" = "#F5ACA0",
+    "Downreg EMT" = "#86C4F3",
+    "Additional GOI: M+" = "#F74B30",
+    "Additional GOI: E+" = "#0672C5",
+    "Additional GOI: Other" = "#DBDDDE"
+  ),
+  NCF2 = c("High" = "#55BA78", "Low" = "#B8F5CD")
+)
+
+stopifnot(all(levels(row_annotation$Marker) %in% names(annotation_colors$Marker)))
+stopifnot(all(levels(col_annotation$NCF2) %in% names(annotation_colors$NCF2)))
+```
+
+```{r Heatmap}
+
+mypalette <- brewer.pal(11, "RdYlBu")
+mycols <- rev(colorRampPalette(mypalette)(255))
+
+pheatmap(
+  mat = t(X),                       
+  color = mycols,
+  cluster_rows = TRUE,
+  cluster_cols = TRUE,
+  main = paste0("Patients with high vs low expression of ", target_gene),
+  annotation_col = col_annotation,
+  annotation_row = row_annotation,
+  annotation_colors = annotation_colors,
+  fontsize_row = 1,                   
+  fontsize_col = 3,
+  cutree_rows = 3,
+  cutree_cols = 3,
+  legend = TRUE,
+  cellwidth = 3
+)
+
+```
+
+```{r Save heatmap, include=FALSE}
+
+outfile <- "NCF2_high_vs_low_heatmap.tiff"
+
+tiff(outfile, width = 8.5, height = 10, units = "in", res = 300, compression = "lzw")
+
+pheatmap(
+  mat = t(X),                       
+  color = mycols,
+  cluster_rows = TRUE,
+  cluster_cols = TRUE,
+  main = paste0("Patients with high vs low expression of ", target_gene),
+  annotation_col = col_annotation,
+  annotation_row = row_annotation,
+  annotation_colors = annotation_colors,
+  fontsize_row = 1,                   
+  fontsize_col = 3,
+  cutree_rows = 3,
+  cutree_cols = 3,
+  legend = TRUE,
+  cellwidth = 3
+)
+dev.off()
+
+```
+
+
+
+
+
+
+
+
+
+
